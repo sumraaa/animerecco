@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>AnimePulse — Advanced (Live API)</title>
+<style>
+:root{
+  --bg:#071028; --card:#0d1726; --accent:#ff6b6b; --accent2:#7bd389; --muted:#9fb0c2;
+  --glass: rgba(255,255,255,0.03); --glass2: rgba(255,255,255,0.02); --radius:14px;
+  --font: Inter, Roboto, "Segoe UI", Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%; margin:0; font-family:var(--font); background:linear-gradient(180deg,#041025 0%, #071028 100%); color:#eaf3ff}
+.app{max-width:1200px;margin:28px auto;padding:18px;border-radius:16px;background:linear-gradient(180deg, rgba(255,255,255,0.015), transparent);display:grid;grid-template-columns:420px 1fr;gap:18px;border:1px solid rgba(255,255,255,0.03);box-shadow:0 10px 40px rgba(0,0,0,0.6)}
+.header{display:flex;align-items:center;gap:12px}
+.logo{width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,var(--accent),#ffb07c);display:flex;align-items:center;justify-content:center;font-weight:800;color:white}
+.panel{background:var(--card);padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.02)}
+.title{margin:0;font-size:18px}
+.lead{margin:4px 0 12px;color:var(--muted);font-size:13px}
+
+/* Left: controls */
+.controls{display:flex;flex-direction:column;gap:12px}
+.question{background:var(--glass);padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.02)}
+.qtitle{font-weight:700;margin-bottom:8px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:8px 12px;border-radius:999px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted);cursor:pointer;font-size:13px}
+.chip.active{background:linear-gradient(90deg,var(--accent),#ff9b9b);color:white;border:1px solid rgba(255,255,255,0.08);transform:translateY(-3px)}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.option{padding:8px 12px;border-radius:10px;background:var(--glass2);border:1px solid rgba(255,255,255,0.02);cursor:pointer;color:var(--muted)}
+.option.selected{background:rgba(255,255,255,0.02);color:white;transform:translateY(-3px);box-shadow:0 8px 20px rgba(0,0,0,0.5)}
+.actions{display:flex;gap:10px;margin-top:6px}
+.btn{background:linear-gradient(90deg,var(--accent),#ffa08f);border:0;color:white;padding:10px 12px;border-radius:10px;cursor:pointer;font-weight:700}
+.btn.secondary{background:transparent;border:1px solid rgba(255,255,255,0.03);color:var(--muted)}
+
+/* sliders */
+.slider-row{display:flex;align-items:center;gap:10px}
+.slider-row input[type="range"]{flex:1}
+
+/* Right: results */
+.results{display:flex;flex-direction:column;gap:12px}
+.results-head{display:flex;justify-content:space-between;align-items:center}
+.results-list{display:flex;flex-direction:column;gap:12px}
+.card{display:flex;gap:12px;padding:12px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,0.015),transparent);border:1px solid rgba(255,255,255,0.02)}
+.poster{width:120px;height:170px;border-radius:8px;overflow:hidden;flex-shrink:0;border:1px solid rgba(255,255,255,0.03);box-shadow:0 10px 30px rgba(0,0,0,0.5)}
+.meta h2{margin:0;font-size:16px}
+.meta p{margin:6px 0;color:var(--muted);font-size:13px}
+.tags{display:flex;gap:8px;flex-wrap:wrap}
+.tag{background:rgba(255,255,255,0.02);padding:6px 8px;border-radius:8px;font-size:12px;color:var(--muted)}
+.empty{padding:20px;border-radius:10px;background:rgba(255,255,255,0.01);color:var(--muted);text-align:center}
+.loading{padding:10px;border-radius:8px;background:rgba(255,255,255,0.02);text-align:center;color:var(--muted)}
+
+/* responsive */
+@media (max-width:980px){.app{grid-template-columns:1fr}.header{justify-content:center}}
+.small{font-size:12px;color:var(--muted)}
+.fade{animation:fade .38s ease both}
+@keyframes fade{from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="panel">
+      <div class="header">
+        <div class="logo">AP</div>
+        <div>
+          <h1 class="title">AnimePulse — Advanced (Live API)</h1>
+          <div class="lead">Live fetch from an anime API (Jikan). Pick preferences and slide importance to get tailored suggestions.</div>
+        </div>
+      </div>
+
+      <div class="controls" id="controls">
+
+        <!-- genre -->
+        <div class="question">
+          <div class="qtitle">Genres (choose 1+)</div>
+          <div class="chips" id="genreChips"></div>
+          <div class="small">Matches across genres increase score.</div>
+        </div>
+
+        <!-- length -->
+        <div class="question">
+          <div class="qtitle">Episode length</div>
+          <div class="row" id="lengthRow">
+            <div class="option" data-value="short">Short &lt;20</div>
+            <div class="option" data-value="medium">Medium 20–50</div>
+            <div class="option" data-value="long">Long 50+</div>
+          </div>
+          <div class="small">Movies count as Short (1).</div>
+        </div>
+
+        <!-- era -->
+        <div class="question">
+          <div class="qtitle">Era</div>
+          <div class="row" id="eraRow">
+            <div class="option" data-value="new">New (2015+)</div>
+            <div class="option selected" data-value="any">Any</div>
+            <div class="option" data-value="old">Old (&lt;2015)</div>
+          </div>
+        </div>
+
+        <!-- majors -->
+        <div class="question">
+          <div class="qtitle">Majors / Tropes (choose any)</div>
+          <div class="chips" id="majorChips"></div>
+          <div class="small">E.g., Time Travel, Mecha, School, Strong MC, Psychological, Sports</div>
+        </div>
+
+        <!-- sliders -->
+        <div class="question">
+          <div class="qtitle">Priority sliders (importance of each)</div>
+          <div class="slider-row"><div class="small">Genre</div><input id="wGenre" type="range" min="0" max="100" value="60"><div class="small" id="wGenreVal">60</div></div>
+          <div class="slider-row"><div class="small">Length</div><input id="wLength" type="range" min="0" max="100" value="40"><div class="small" id="wLengthVal">40</div></div>
+          <div class="slider-row"><div class="small">Era</div><input id="wEra" type="range" min="0" max="100" value="30"><div class="small" id="wEraVal">30</div></div>
+          <div class="slider-row"><div class="small">Majors</div><input id="wMajors" type="range" min="0" max="100" value="50"><div class="small" id="wMajorsVal">50</div></div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:8px">
+          <button id="btnSuggest" class="btn">Suggest Anime</button>
+          <button id="btnReset" class="btn secondary">Reset</button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- results -->
+    <div class="panel results">
+      <div class="results-head">
+        <div>
+          <h3 style="margin:0">Recommendations</h3>
+          <div class="small">Top matches based on your weighted preferences.</div>
+        </div>
+        <div class="small" id="statusTag">Live — Jikan API</div>
+      </div>
+
+      <div id="resultsList" class="results-list">
+        <div class="empty">Choose preferences and press <strong>Suggest Anime</strong>.</div>
+      </div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button id="btnShowAll" class="btn secondary">Show All</button>
+        <button id="btnSurprise" class="btn secondary">Surprise Me</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ============= FALLBACK: original small DB (used if API fails) ============= */
+const FALLBACK_DB = [
+  {id:'fmab', title:'Fullmetal Alchemist: Brotherhood', genres:['Action','Fantasy','Adventure'], length:'medium', episodes:64, year:2009, era:'old', majors:['Brotherhood','Alchemy','Military'], watch:'https://www.justwatch.com/in/search?q=Fullmetal%20Alchemist%3A%20Brotherhood', trailer:'https://www.youtube.com/results?search_query=Fullmetal+Alchemist%3A+Brotherhood+official+trailer'},
+  {id:'aot', title:'Attack on Titan', genres:['Action','Drama','Mystery'], length:'long', episodes:87, year:2013, era:'old', majors:['War','Conspiracy','Dark'], watch:'https://www.justwatch.com/in/search?q=Attack%20on%20Titan', trailer:'https://www.youtube.com/results?search_query=Attack+on+Titan+anime'},
+  {id:'dn', title:'Death Note', genres:['Mystery','Psychological','Thriller'], length:'short', episodes:37, year:2006, era:'old', majors:['Mindgame','Detective','Psychological'], watch:'https://www.justwatch.com/in/search?q=Death%20Note', trailer:'https://www.youtube.com/results?search_query=Death+Note+anime'},
+  {id:'naruto', title:'Naruto', genres:['Action','Adventure'], length:'long', episodes:220, year:2002, era:'old', majors:['Ninja','Friendship','Long-running'], watch:'https://www.justwatch.com/in/search?q=Naruto%20(2002)', trailer:'https://www.youtube.com/results?search_query=Naruto+anime+trailer'}
+];
+
+/* runtime DB that will be populated from API or fallback */
+let ANIME_DB = [];
+
+/* helpers for external links */
+const JW = title => `https://www.justwatch.com/in/search?q=${encodeURIComponent(title)}`;
+const YT = title => `https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' official trailer')}`;
+
+/* ============= Live API loader (Jikan public API) ============= */
+// We'll fetch several pages (if needed) and normalize the data to our expected shape.
+async function fetchFromJikan(pages = 1, perPage = 24){
+  const collected = [];
+  try{
+    for(let p=1;p<=pages;p++){
+      const res = await fetch(`https://api.jikan.moe/v4/anime?page=${p}&limit=${perPage}`);
+      if(!res.ok) throw new Error('Jikan fetch failed: '+res.status);
+      const json = await res.json();
+      if(!json.data || !Array.isArray(json.data)) break;
+      json.data.forEach(item => {
+        try{
+          const title = item.title || item.title_english || 'Unknown';
+          const genres = (item.genres || []).map(g=>g.name).concat((item.themes||[]).map(t=>t.name));
+          const episodes = item.episodes || (item.duration && item.duration.includes('min') ? 1 : null) || 0;
+          const year = item.aired && item.aired.from ? (new Date(item.aired.from)).getFullYear() : (item.year || (item.broadcast ? new Date(item.broadcast).getFullYear() : null)) || 0;
+          const era = year>=2015 ? 'new' : 'old';
+          const length = episodes===1 ? 'short' : (episodes>0 && episodes<20 ? 'short' : (episodes>=20 && episodes<=50 ? 'medium' : (episodes>50 ? 'long' : 'medium')));
+          const majors = Array.from(new Set((item.demographics||[]).map(d=>d.name).concat((item.producers||[]).map(p=>p.name)).concat((item.genres||[]).map(g=>g.name)))).slice(0,6);
+          const watch = item.url ? item.url : JW(title);
+          const trailer = (item.trailer && item.trailer.url) ? item.trailer.url : YT(title);
+          const img = (item.images && item.images.jpg && item.images.jpg.image_url) ? item.images.jpg.image_url : null;
+          collected.push({ id: String(item.mal_id || title).toLowerCase(), title, genres: Array.from(new Set(genres)), length, episodes: episodes || 0, year, era, majors, watch, trailer, image: img });
+        }catch(e){ /* ignore single item errors */ }
+      });
+      // stop early if nothing returned
+      if(!json.pagination || !json.pagination.has_next_page) break;
+    }
+    return collected;
+  }catch(err){ console.warn('API load error', err); return null; }
+}
+
+/* ============= utility: unique genres & majors (populated after DB ready) ============= */
+let GENRES = [];
+let MAJORS = [];
+
+function populateChips(){
+  const genreChips = document.getElementById('genreChips'); genreChips.innerHTML='';
+  const majorChips = document.getElementById('majorChips'); majorChips.innerHTML='';
+  GENRES.forEach(g=>{
+    const btn=document.createElement('button'); btn.className='chip'; btn.textContent=g; btn.dataset.value=g;
+    btn.addEventListener('click',()=>btn.classList.toggle('active'));
+    genreChips.appendChild(btn);
+  });
+  MAJORS.forEach(m=>{
+    const btn=document.createElement('button'); btn.className='chip'; btn.textContent=m; btn.dataset.value=m;
+    btn.addEventListener('click',()=>btn.classList.toggle('active'));
+    majorChips.appendChild(btn);
+  });
+}
+
+/* ============= UI setup (radio-like & sliders) ============= */
+function setupRadio(id){
+  const row=document.getElementById(id);
+  row.querySelectorAll('.option').forEach(opt=>{
+    opt.addEventListener('click', ()=>{
+      row.querySelectorAll('.option').forEach(o=>o.classList.remove('selected'));
+      opt.classList.add('selected');
+    });
+  });
+}
+setupRadio('lengthRow'); setupRadio('eraRow');
+
+const sliders = ['wGenre','wLength','wEra','wMajors'];
+sliders.forEach(id=>{
+  const s=document.getElementById(id), v=document.getElementById(id+'Val');
+  s.addEventListener('input', ()=>v.textContent=s.value);
+});
+
+/* ============= Poster generator (SVG data URL) — used when an image isn't available ============= */
+function posterDataURL(title, subtitle, year){
+  const w=360,h=520;
+  const c1='#ff9b9b', c2='#7bd389';
+  const safeTitle=escapeHtml(title), safeSub=escapeHtml(subtitle || '');
+  const svg=`<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}'>
+    <defs><linearGradient id='g' x1='0' x2='1'><stop offset='0' stop-color='${c1}'/><stop offset='1' stop-color='${c2}'/></linearGradient></defs>
+    <rect width='100%' height='100%' rx='16' fill='url(#g)'/>
+    <rect x='18' y='18' width='324' height='360' rx='10' fill='rgba(255,255,255,0.06)'/>
+    <text x='180' y='420' font-size='22' font-weight='700' text-anchor='middle' fill='white' font-family='Segoe UI, Roboto, Arial'>${safeTitle}</text>
+    <text x='180' y='450' font-size='12' text-anchor='middle' fill='rgba(255,255,255,0.9)'>${year} • ${safeSub}</text>
+  </svg>`;
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+}
+function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ============= Preference helpers ============= */
+function getSelectedGenres(){ return Array.from(document.getElementById('genreChips').querySelectorAll('.chip.active')).map(c=>c.dataset.value) }
+function getSelectedMajors(){ return Array.from(document.getElementById('majorChips').querySelectorAll('.chip.active')).map(c=>c.dataset.value) }
+function getSelectedOption(rowId){ const sel=document.getElementById(rowId).querySelector('.option.selected'); return sel? sel.dataset.value : null }
+function getWeights(){ return { genre:+document.getElementById('wGenre').value, length:+document.getElementById('wLength').value, era:+document.getElementById('wEra').value, majors:+document.getElementById('wMajors').value } }
+
+/* ============= Scoring algorithm ============= */
+function scoreAnime(pref, weights){
+  const results = ANIME_DB.map(a=>{
+    let gMatch = 0;
+    if(pref.genres.length>0) gMatch = pref.genres.filter(g=>a.genres.includes(g)).length / pref.genres.length; // 0..1
+    let mMatch = 0;
+    if(pref.majors.length>0) mMatch = pref.majors.filter(m=>a.majors.includes(m)).length / pref.majors.length; // 0..1
+
+    let lenMatch = 0;
+    if(pref.length) lenMatch = (a.length === pref.length) ? 1 : 0;
+
+    let eraMatch = 0;
+    if(pref.era==='any') eraMatch = 0.5; else eraMatch = (a.era === pref.era) ? 1 : 0;
+
+    const compGenre = gMatch;      // 0..1
+    const compMajors = mMatch;     // 0..1
+    const compLength = lenMatch;   // 0 or 1
+    const compEra = eraMatch;      // 0..1
+
+    const wg = weights.genre/100, wl = weights.length/100, we = weights.era/100, wm = weights.majors/100;
+    let yearBoost = 0;
+    if(pref.era==='new') yearBoost = Math.max(0,(a.year - 2010)/20)/10; // small bump
+    const score = (compGenre * wg * 4) + (compMajors * wm * 3) + (compLength * wl * 2) + (compEra * we * 1) + yearBoost + Math.random()*0.02;
+    return {id:a.id, score};
+  });
+  results.sort((a,b)=>b.score - a.score);
+  return results;
+}
+
+/* ============= Render results ============= */
+const resultsList = document.getElementById('resultsList');
+function renderRecommendations(sorted){
+  resultsList.innerHTML = '';
+  if(!sorted || sorted.length===0){ resultsList.innerHTML = '<div class="empty">No matches.</div>'; return; }
+  const top = sorted.map(s => ANIME_DB.find(a=>a.id===s.id)).filter(Boolean);
+  top.slice(0,4).forEach(a=>{
+    const div=document.createElement('div'); div.className='card fade';
+    const p=document.createElement('div'); p.className='poster';
+    const img=document.createElement('img');
+    if(a.image){ img.src = a.image; } else { img.src = posterDataURL(a.title, (a.episodes===1?'Movie':'series'), a.year); }
+    img.alt=a.title; img.style.width='100%'; img.style.height='100%'; img.style.objectFit='cover';
+    p.appendChild(img);
+    const meta=document.createElement('div'); meta.className='meta';
+    const h=document.createElement('h2'); h.textContent=a.title;
+    const desc=document.createElement('p'); desc.textContent = `${a.year} • ${a.episodes} ep(s) • ${a.genres.join(', ')}`;
+    const blurb=document.createElement('p'); blurb.className='small'; blurb.textContent = createBlurb(a);
+    const tags=document.createElement('div'); tags.className='tags';
+    a.genres.concat(a.majors).slice(0,6).forEach(t=>{ const tk=document.createElement('div'); tk.className='tag'; tk.textContent=t; tags.appendChild(tk); });
+
+    const btnWrap=document.createElement('div'); btnWrap.style.display='flex'; btnWrap.style.gap='8px'; btnWrap.style.marginTop='10px';
+
+    const watchBtn=document.createElement('a');
+    watchBtn.className='btn'; watchBtn.textContent='Where to watch';
+    watchBtn.href=a.watch || JW(a.title); watchBtn.target='_blank'; watchBtn.rel='noopener noreferrer';
+
+    const trailerBtn=document.createElement('a');
+    trailerBtn.className='btn secondary'; trailerBtn.textContent='Watch trailer';
+    trailerBtn.href=a.trailer || YT(a.title); trailerBtn.target='_blank'; trailerBtn.rel='noopener noreferrer';
+
+    btnWrap.appendChild(watchBtn);
+    btnWrap.appendChild(trailerBtn);
+
+    meta.appendChild(h); meta.appendChild(desc); meta.appendChild(blurb); meta.appendChild(tags); meta.appendChild(btnWrap);
+    div.appendChild(p); div.appendChild(meta);
+    resultsList.appendChild(div);
+  });
+
+  // collapsed list of more
+  const more = document.createElement('details'); more.style.marginTop='8px';
+  more.innerHTML = '<summary class="small" style="cursor:pointer;color:var(--muted)">Show more suggestions</summary>';
+  const box=document.createElement('div'); box.style.marginTop='8px';
+  sorted.slice(4).forEach(s=>{
+    const a = ANIME_DB.find(x=>x.id===s.id);
+    if(!a) return;
+    const row=document.createElement('div'); row.className='card'; row.style.alignItems='center'; row.style.justifyContent='space-between';
+    row.innerHTML = `<div style="flex:1"><strong>${a.title}</strong><div class="small" style="margin-top:6px;color:var(--muted)">${a.year} • ${a.episodes} ep(s) • ${a.genres.join(', ')}</div></div>`;
+    box.appendChild(row);
+  });
+  more.appendChild(box);
+  resultsList.appendChild(more);
+}
+function createBlurb(a){
+  return `${a.title} is a ${a.genres.join('/')} ${a.episodes===1 ? 'movie' : 'series'} known for ${a.majors.slice(0,3).join(', ')}.`;
+}
+
+/* ============= Button handlers ============= */
+document.getElementById('btnSuggest').addEventListener('click', ()=>{
+  const pref = { genres: getSelectedGenres(), majors: getSelectedMajors(), length: getSelectedOption('lengthRow'), era: getSelectedOption('eraRow') || 'any' };
+  const weights = getWeights();
+  if(pref.genres.length===0 && pref.majors.length===0 && !pref.length && pref.era==='any'){
+    if(!confirm('No preferences selected. Show popular picks anyway?')) return;
+  }
+  const scored = scoreAnime(pref, weights);
+  renderRecommendations(scored);
+});
+
+document.getElementById('btnReset').addEventListener('click', ()=>{
+  document.querySelectorAll('.chip.active').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('.option.selected').forEach(o=>o.classList.remove('selected'));
+  document.querySelector('#eraRow .option[data-value="any"]').classList.add('selected');
+  document.getElementById('wGenre').value=60; document.getElementById('wGenreVal').textContent='60';
+  document.getElementById('wLength').value=40; document.getElementById('wLengthVal').textContent='40';
+  document.getElementById('wEra').value=30; document.getElementById('wEraVal').textContent='30';
+  document.getElementById('wMajors').value=50; document.getElementById('wMajorsVal').textContent='50';
+  resultsList.innerHTML = '<div class="empty">Selections reset. Choose preferences and press <strong>Suggest Anime</strong>.</div>';
+});
+
+document.getElementById('btnShowAll').addEventListener('click', ()=> {
+  const list = ANIME_DB.map(a=>({id:a.id, score: Math.random()})).sort((a,b)=>b.score-a.score);
+  renderRecommendations(list);
+});
+
+document.getElementById('btnSurprise').addEventListener('click', ()=> {
+  if(ANIME_DB.length===0){ alert('No data loaded yet.'); return; }
+  const idx = Math.floor(Math.random()*ANIME_DB.length);
+  renderRecommendations([{id:ANIME_DB[idx].id, score:1}].concat(ANIME_DB.filter((_,i)=>i!==idx).map(a=>({id:a.id, score:Math.random()}))));
+});
+
+/* allow Enter inside left panel to trigger */
+document.getElementById('controls').addEventListener('keydown', (e)=>{ if(e.key==='Enter') document.getElementById('btnSuggest').click(); });
+
+/* ============= Initialization: try API, else fallback ============= */
+(async function init(){
+  const status = document.getElementById('statusTag');
+  resultsList.innerHTML = '<div class="loading">Loading latest anime from API…</div>';
+  // try to fetch 2 pages (48 items) to have a decent sample
+  const data = await fetchFromJikan(2,24);
+  if(data && data.length>0){
+    ANIME_DB = data;
+    status.textContent = `Live — Jikan API (${ANIME_DB.length} items)`;
+  } else {
+    console.warn('Falling back to local DB');
+    ANIME_DB = FALLBACK_DB;
+    status.textContent = `Offline — using fallback (${ANIME_DB.length} items)`;
+  }
+
+  // derive GENRES / MAJORS from loaded DB (sorted)
+  GENRES = Array.from(new Set(ANIME_DB.flatMap(a=>a.genres))).sort();
+  MAJORS = Array.from(new Set(ANIME_DB.flatMap(a=>a.majors))).sort();
+  populateChips();
+
+  resultsList.innerHTML = '<div class="empty">Loaded anime. Choose preferences and press <strong>Suggest Anime</strong>.</div>';
+})();
+
+</script>
+</body>
+</html>
